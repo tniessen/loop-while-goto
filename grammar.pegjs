@@ -12,6 +12,7 @@ Statement
 StatementInner
   = assignment:Assignment { return assignment; }
   / loop:Loop { return loop; }
+  / whileStmt:While { return whileStmt; }
   / ifStmt:IfStatement { return ifStmt; }
 
 Assignment
@@ -32,6 +33,10 @@ Operator
 Loop
   = 'LOOP' __ count:Atomic __ 'DO' __ body:Program __ 'END'
     { return { type: 'loop', count, body }; }
+
+While
+  = 'WHILE' __ condition:BoolExpr __ 'DO' __ body:Program __ 'END'
+    { return { type: 'while', condition, body }; }
 
 IfStatement
   = 'IF' __ condition:BoolExpr __ 'THEN' __ thenPart:Program __ elsePart:('ELSE' __ p:Program __ { return p; })? 'END'

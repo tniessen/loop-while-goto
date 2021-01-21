@@ -135,6 +135,14 @@ function compile(program) {
       code.push(['jmp', loopEntryIndex]);
       skipLoopBody.push(code.length);
       code.push(['pop']);
+    } else if (statement.type === 'while') {
+      const loopEntryIndex = code.length;
+      compileBoolExpr(statement.condition);
+      const skipLoopBody = ['jz'];
+      code.push(skipLoopBody);
+      compileStatements(statement.body);
+      code.push(['jmp', loopEntryIndex]);
+      skipLoopBody.push(code.length);
     } else if (statement.type === 'if') {
       const { condition, thenPart, elsePart } = statement;
       compileBoolExpr(condition);
