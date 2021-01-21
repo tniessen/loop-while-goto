@@ -1,0 +1,60 @@
+foo := 10;
+bar := 20;
+baz := 30;
+
+IF foo < bar THEN
+  baz := baz * baz
+END;
+
+foo := 999;
+IF baz = 900 THEN
+  foo := 0
+END;
+
+IF foo <> 999 THEN
+  bar := 1
+END;
+
+baz := 0;
+LOOP bar DO
+  baz := baz + 1
+END;
+
+foo := 0;
+IF baz >= 1 THEN
+  IF baz <= 1 THEN
+    baz := 26;
+    foo := baz MOD 3
+  END
+END;
+
+// foo should have the value 2 now
+
+baz := 1;
+LOOP foo DO
+  baz := baz * foo
+END;
+
+// baz should have the value 4 now
+
+bar := 1;
+IF baz <> 4 THEN
+  bar := 2
+ELSE
+  foo := 27;
+  bar := foo DIV 28
+END;
+
+// bar should be zero and foo 27.
+
+baz := 10;
+LOOP foo DO
+  bar := bar + baz;
+  baz := baz - 5
+END;
+
+// bar is now 15.
+
+IF bar = 15 THEN
+  ok := 1
+END
