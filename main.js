@@ -1,7 +1,69 @@
 'use strict';
 
-function downloadGrammar() {
-  return fetch(`/grammar.pegjs?t=${Date.now()}`).then((response) => response.text());
+const editView = document.getElementById('edit-view');
+const executionView = document.getElementById('execution-view');
+
+const sourceInput = document.querySelector('#source-input');
+const sourceDisplay = document.querySelector('#source-display');
+const varsInput = document.querySelector('#variable-input');
+const varsDisplay = document.querySelector('#variable-display');
+
+const executionStatusField = document.getElementById('execution-status-field');
+
+const stepButton = document.getElementById('step-button');
+const resumeButton = document.getElementById('resume-button');
+const pauseButton = document.getElementById('pause-button');
+const resetButton = document.getElementById('reset-button');
+
+document.getElementById('switch-to-execution-button').addEventListener('click', () => {
+  switchToExecutionView();
+});
+
+document.getElementById('back-to-edit-button').addEventListener('click', () => {
+  switchToEditView();
+});
+
+let currentExecutionContext;
+
+stepButton.addEventListener('click', () => {
+  if (currentExecutionContext !== undefined) {
+    currentExecutionContext.step();
+  }
+});
+
+resumeButton.addEventListener('click', () => {
+  if (currentExecutionContext !== undefined) {
+    currentExecutionContext.resume();
+  }
+});
+
+pauseButton.addEventListener('click', () => {
+  if (currentExecutionContext !== undefined) {
+    currentExecutionContext.pause();
+  }
+});
+
+resetButton.addEventListener('click', () => {
+  if (currentExecutionContext !== undefined) {
+    currentExecutionContext.reset();
+  }
+});
+
+function switchToEditView() {
+  editView.classList.remove('hidden');
+  executionView.classList.add('hidden');
+
+  if (currentExecutionContext !== undefined) {
+    currentExecutionContext.destroy();
+    currentExecutionContext = undefined;
+  }
+}
+
+function switchToExecutionView() {
+  editView.classList.add('hidden');
+  executionView.classList.remove('hidden');
+
+  prepareExecution();
 }
 
 function clearLog() {
@@ -109,110 +171,6 @@ function compile(program) {
   return { code, sourcePositions };
 }
 
-function initVirtualMachine(code) {
-  // Extract variable names from the code.
-  const variableNameSet = new Set();
-  for (const [opcode, operand] of code) {
-    if (opcode === 'push' || (opcode === 'pop' && operand != null)) {
-        variableNameSet.add(operand);
-    }
-  }
-
-  // Sort the names.
-  const variableNames = [...variableNameSet].sort((a, b) => {
-    return parseInt(a.substring(1), 10) - parseInt(b.substring(1), 10);
-  });
-
-  const _vars = {};
-  for (const name of variableNames)
-    _vars[name] = 0;
-  let _programCounter = 0;
-  const _stack = [];
-  const cpu = {
-    get pc() {
-      return _programCounter;
-    },
-    set pc(value) {
-      if (!Number.isSafeInteger(value) || value < 0 || value > code.length)
-        throw new Error();
-      _programCounter = value;
-    },
-    get(name) {
-      return _vars[name];
-    },
-    set(name, value) {
-      _vars[name] = value;
-    },
-    push(value) {
-      _stack.push(value);
-    },
-    pop() {
-      if (_stack.length === 0)
-        throw new Error();
-      return _stack.pop();
-    },
-    peek() {
-      if (_stack.length === 0)
-        throw new Error();
-      return _stack[_stack.length - 1];
-    },
-    get reachedEndOfCode() {
-      return _programCounter === code.length;
-    }
-  };
-
-  const pop2 = (fn) => ((last) => fn(cpu.pop(), last))(cpu.pop());
-
-  const impl = {
-    push: (name) => cpu.push(cpu.get(name)),
-    pop: (name) => ((v) => name != null && cpu.set(name, v))(cpu.pop()),
-    dup: () => cpu.push(cpu.peek()),
-    ldc: (c) => cpu.push(c),
-    jmp: (o) => cpu.pc = o,
-    jz: (o) => cpu.pop() === 0 && (cpu.pc = o),
-    eq: () => cpu.push(pop2((a, b) => +(a === b))),
-    lt: () => cpu.push(pop2((a, b) => +(a < b))),
-    gt: () => cpu.push(pop2((a, b) => +(a > b))),
-    leq: () => cpu.push(pop2((a, b) => +(a <= b))),
-    geq: () => cpu.push(pop2((a, b) => +(a >= b))),
-    ne: () => cpu.push(pop2((a, b) => +(a !== b))),
-    sub: () => cpu.push(Math.max(0, pop2((a, b) => a - b))),
-    add: () => cpu.push(pop2((a, b) => a + b)),
-    mul: () => cpu.push(pop2((a, b) => a * b)),
-    div: () => cpu.push(Math.floor(pop2((a, b) => a / b))),
-    rem: () => cpu.push(pop2((a, b) => a % b))
-  };
-
-  cpu.step = () => {
-    if (cpu.reachedEndOfCode) {
-      return;
-    }
-
-    const [opcode, operand] = code[cpu.pc++];
-    console.log('Step:', cpu.pc - 1, opcode, operand);
-    const oldStack = [..._stack];
-    const fn = impl[opcode];
-    if (fn) {
-      fn(operand);
-    } else {
-      throw new Error(`Invalid opcode: ${opcode}`);
-    }
-    console.log('->', oldStack, _stack);
-  }
-
-  return {
-    variableNames,
-    cpu
-  };
-}
-
-const codeInput = document.querySelector('#program textarea');
-const codeDisplay = document.querySelector('#program pre');
-const varsInput = document.querySelector('#variables textarea');
-const varsTable = document.querySelector('#variables table');
-const varsTableBody = document.querySelector('#variables tbody');
-const startButton = document.getElementById('start-button');
-
 function createSpan(text, config) {
   const { start, end, children, call } = config;
 
@@ -240,115 +198,134 @@ function createSpan(text, config) {
   return span;
 }
 
-startButton.addEventListener('click', () => {
-  clearLog();
-  codeInput.classList.add('hidden');
-  varsInput.classList.add('hidden');
-  startButton.classList.add('hidden');
+function downloadGrammar() {
+  return fetch(`/grammar.pegjs?t=${Date.now()}`)
+         .then((response) => response.text());
+}
 
-  codeDisplay.classList.remove('hidden');
-  varsTable.classList.remove('hidden');
-  codeDisplay.innerHTML = '';
-  varsTableBody.innerHTML = '';
-
-  const source = codeInput.value;
-  codeDisplay.textContent = source;
-
+function loadAndCompileGrammar() {
   displayLog('Loading grammar definition...');
-  downloadGrammar().then((grammar) => {
+  return downloadGrammar().then((grammar) => {
     displayLog('Compiling grammar...');
-    const parser = peg.generate(grammar);
-    displayLog('Parsing program...');
-    try {
-      const { program } = parser.parse(source);
-      console.log(program);
-
-      function createSpanForStatement(statement) {
-        const span = {
-          start: statement.location.start.offset,
-          end: statement.location.end.offset
-        };
-
-        if (statement.type === 'assignment') {
-          span.call = (e) => e.classList.add('text-yellow-600');
-        } else if (statement.type === 'loop') {
-          span.call = (e) => e.classList.add('text-green-600');
-          span.children = statement.body.map(createSpanForStatement);
-        } else if (statement.type === 'if') {
-          span.call = (e) => e.classList.add('text-red-600');
-          span.children = statement.thenPart.map(createSpanForStatement);
-          if (statement.elsePart) {
-            span.children.push(...statement.elsePart.map(createSpanForStatement));
-          }
-        }
-
-        return span;
-      }
-
-      const rootSpan = {
-        start: 0,
-        end: source.length,
-        children: program.map(createSpanForStatement)
-      };
-      const span = createSpan(source, rootSpan);
-      codeDisplay.innerHTML = '';
-      codeDisplay.appendChild(span);
-
-      displayLog('Compiling program...');
-      const { code, sourcePositions } = compile(program);
-      console.log(code);
-      console.log(sourcePositions);
-
-      const instructionToSourcePositionMap = new Map(
-        Array.from(sourcePositions, a => a.reverse())
-      );
-      function isSourcePosition(codePosition) {
-        return instructionToSourcePositionMap.has(codePosition);
-      }
-
-      displayLog('Starting program...');
-      const vm = initVirtualMachine(code);
-      const varValueCells = new Map();
-      for (const name of vm.variableNames) {
-        const row = document.createElement('tr');
-        const nameCell = document.createElement('td');
-        nameCell.classList.add('text-right', 'border-r-2', 'pr-4');
-        nameCell.textContent = name;
-        row.appendChild(nameCell);
-        const valueCell = document.createElement('td');
-        valueCell.classList.add('text-left', 'pl-4');
-        valueCell.textContent = vm.cpu.get(name);
-        row.appendChild(valueCell);
-        varsTableBody.appendChild(row);
-        varValueCells.set(name, valueCell);
-      }
-      let stepInterval = setInterval(() => {
-        try {
-          do {
-            vm.cpu.step();
-          } while (!vm.cpu.reachedEndOfCode && !isSourcePosition(vm.cpu.pc));
-          codeDisplay.innerHTML = '';
-          const sourcePos = instructionToSourcePositionMap.get(vm.cpu.pc);
-          const before = source.substring(0, sourcePos);
-          const after = source.substring(sourcePos);
-          codeDisplay.textContent = before;
-          codeDisplay.textContent += '👁';
-          codeDisplay.textContent += after;
-
-          for (const name of vm.variableNames) {
-            varValueCells.get(name).textContent = vm.cpu.get(name);
-          }
-        } catch (err) {
-          console.error(err);
-          clearInterval(stepInterval);
-        }
-      }, 100);
-    } catch (err) {
-      console.error(err);
-      displayLog(String(err));
-      if (err.location) {
-        displayLog(`Near line ${err.location.start.line}`);
-      }
-    }
+    return peg.generate(grammar);
   });
-});
+}
+
+function parseProgram(source) {
+  return loadAndCompileGrammar().then((parser) => {
+    displayLog('Parsing program...');
+    const { program } = parser.parse(source);
+    return program;
+  });
+}
+
+function parseAndCompileProgram(source) {
+  return parseProgram(source).then((program) => {
+    displayLog('Compiling program...');
+    const { code, sourcePositions } = compile(program);
+    return { source, code, sourcePositions };
+  });
+}
+
+function displayState({ pc, vars, reachedEndOfCode, isRunning, totalSteps }) {
+  setButtonEnabled(stepButton, !isRunning && !reachedEndOfCode);
+  setButtonEnabled(resumeButton, !isRunning && !reachedEndOfCode);
+  setButtonEnabled(pauseButton, isRunning);
+  setButtonEnabled(resetButton, true);
+
+  if (isRunning) {
+    executionStatusField.textContent = 'The program is still running.';
+  } else if (reachedEndOfCode) {
+    executionStatusField.textContent = `The program reached its end after ${totalSteps} steps.`;
+  } else {
+    executionStatusField.textContent = 'The program is paused.';
+  }
+
+  const varNames = Object.keys(vars);
+  if (varsDisplay.children.length !== varNames.length) {
+    varsDisplay.innerHTML = '';
+
+    for (let i = 0; i < varNames.length; i++) {
+      const row = document.createElement('tr');
+      const nameCell = document.createElement('td');
+      nameCell.classList.add('text-right', 'border-r-2', 'pr-4', 'var-name');
+      row.appendChild(nameCell);
+      const valueCell = document.createElement('td');
+      valueCell.classList.add('text-left', 'pl-4', 'var-value');
+      row.appendChild(valueCell);
+      varsDisplay.appendChild(row);
+    }
+  }
+
+  for (let i = 0; i < varNames.length; i++) {
+    const row = varsDisplay.children[i];
+    row.querySelector('.var-name').textContent = varNames[i];
+    row.querySelector('.var-value').textContent = vars[varNames[i]];
+  }
+}
+
+function createExecutionContext({ source, code, sourcePositions }) {
+  const worker = new Worker(`worker.js?t=${Date.now()}`);
+
+  worker.addEventListener('message', (event) => {
+    displayState(event.data);
+  });
+
+  function init() {
+    worker.postMessage({ type: 'init', code });
+  }
+
+  init();
+
+  return {
+    reset() {
+      init();
+    },
+    resume() {
+      worker.postMessage({ type: 'resume' });
+    },
+    pause() {
+      worker.postMessage({ type: 'pause' });
+    },
+    destroy() {
+      worker.terminate();
+    }
+  };
+}
+
+function setButtonEnabled(button, enabled) {
+  if (enabled) {
+    button.disabled = false;
+    button.classList.remove('opacity-50');
+  } else {
+    button.disabled = true;
+    button.classList.add('opacity-50');
+  }
+}
+
+function prepareExecution() {
+  clearLog();
+
+  for (const button of [stepButton, resumeButton, pauseButton, resetButton]) {
+    setButtonEnabled(button, false);
+  }
+
+  sourceDisplay.innerHTML = '';
+  varsDisplay.innerHTML = '';
+
+  const source = sourceInput.value;
+  sourceDisplay.textContent = source;
+
+  parseAndCompileProgram(source)
+  .then((compiled) => {
+    displayLog('Preparing execution...');
+    currentExecutionContext = createExecutionContext(compiled);
+  })
+  .catch((err) => {
+    let msg = String(err);
+    if (err.location && err.location.start) {
+      msg += ` (near line ${err.location.start.line})`;
+    }
+    displayLog(msg);
+  });
+}

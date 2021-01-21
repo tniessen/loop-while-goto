@@ -8,27 +8,47 @@
   <body class="bg-gray-800 text-white">
     <div class="container mx-auto my-8">
       <h1 class="text-3xl mb-8">LOOP Interpreter</h1>
-      <div class="grid grid-cols-3 gap-4 my-8">
-        <div id="program" class="font-mono col-span-2 border-2 bg-gray-900">
-          <textarea class="w-full bg-gray-900 p-2" rows="15" placeholder="Enter code here"></textarea>
-          <pre class="w-full p-2 hidden"></pre>
+
+      <div id="edit-view">
+        <div class="grid grid-cols-3 gap-4 my-8">
+          <div class="font-mono col-span-2 border-2 bg-gray-900">
+            <textarea id="source-input" class="w-full bg-gray-900 p-2" rows="15" placeholder="Enter code here"></textarea>
+          </div>
+          <div class="font-mono border-2 bg-gray-900">
+            <textarea id="variable-input" class="w-full bg-gray-900 hidden" rows="15" placeholder="Input variables"></textarea>
+          </div>
         </div>
-        <div id="variables" class="font-mono border-2 bg-gray-900">
-          <textarea id="variables" class="w-full bg-gray-900" rows="15" placeholder="Input variables"></textarea>
-          <table class="w-full hidden table-fixed">
-            <thead>
-              <tr>
-                <th class="border-b-2 border-r-2 w-1/2">Variable</th>
-                <th class="border-b-2 w-1/2">Value</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+        <button type="button" class="border-2 p-2" id="switch-to-execution-button">Start</button>
+      </div><!-- edit view -->
+
+      <div id="execution-view" class="hidden">
+        <div class="grid grid-cols-3 gap-4 my-8">
+          <pre id="source-display" class="font-mono col-span-2 border-2 bg-gray-900"></pre>
+          <div>
+            <div id="control-buttons" class="w-full">
+              <div class="grid grid-cols-4 gap-2 mb-2">
+                <button type="button" class="border-2 py-2 hidden" id="step-button">Step</button>
+                <button type="button" class="border-2 py-2" id="resume-button">▶ Resume</button>
+                <button type="button" class="border-2" id="pause-button">⏸ Pause</button>
+                <button type="button" class="border-2" id="reset-button">⏹ Reset</button>
+              </div>
+              <div id="execution-status-field" class="mb-6"></div>
+              <table class="w-full table-fixed border-2 bg-gray-900">
+                <thead>
+                  <tr>
+                    <th class="border-b-2 border-r-2 w-1/2">Variable</th>
+                    <th class="border-b-2 w-1/2">Value</th>
+                  </tr>
+                </thead>
+                <tbody id="variable-display"></tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
-      <button type="button" class="border-2 px-8 py-2" id="start-button">Start</button>
+        <button type="button" class="border-2 p-2" id="back-to-edit-button">Back to Edit</button>
+      </div><!-- execution-view -->
+
       <textarea id="log" class="block w-full font-mono border-2 mt-6 bg-gray-900" rows="10" readonly></textarea>
-      </div>
     </div>
     <script src="peg-0.10.0.min.js"></script>
     <script src="main.js"></script>
