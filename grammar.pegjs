@@ -2,7 +2,7 @@ Start
   = _ program:Program _ { return { program }; }
 
 Program
-  = stmt:Statement stmts:(';' _ otherStmt:Statement { return otherStmt; })*
+  = stmt:Statement stmts:(_ ';' _ otherStmt:Statement { return otherStmt; })*
     { return [stmt, ...stmts]; }
 
 Statement
