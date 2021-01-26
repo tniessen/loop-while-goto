@@ -235,45 +235,101 @@ function parseAndCompileProgram(source) {
   });
 }
 
-function displayState({ pc, vars, reachedEndOfCode, isRunning, totalSteps }) {
-  setButtonEnabled(stepButton, !isRunning && !reachedEndOfCode);
-  setButtonEnabled(resumeButton, !isRunning && !reachedEndOfCode);
-  setButtonEnabled(pauseButton, isRunning);
-  setButtonEnabled(resetButton, true);
+function displaySourceCode({ pc, source, sourcePositions, isRunning }) {
+  sourceDisplay.innerHTML = '';
+  if (!isRunning) {
+    let lastKnownSourcePosition, nextKnownSourcePosition;
+    let lastKnownPcDistance = Infinity, nextKnownPcDistance = Infinity;
+    for (const knownSourcePosition of sourcePositions.keys()) {
+      const knownPc = sourcePositions.get(knownSourcePosition);
+      const distance = Math.abs(knownPc - pc);
+      if (knownPc <= pc) {
+        if (distance < lastKnownPcDistance || (distance === lastKnownPcDistance && knownSourcePosition > lastKnownSourcePosition)) {
+          lastKnownSourcePosition = knownSourcePosition;
+          lastKnownPcDistance = distance;
+        }
+      } else {
+        if (distance < nextKnownPcDistance || (distance === nextKnownPcDistance && knownSourcePosition < nextKnownSourcePosition)) {
+          nextKnownSourcePosition = knownSourcePosition;
+          nextKnownPcDistance = distance;
+        }
+      }
+    }
 
-  if (isRunning) {
-    executionStatusField.textContent = 'The program is still running.';
-  } else if (reachedEndOfCode) {
-    executionStatusField.textContent = `The program reached its end after ${totalSteps} steps.`;
-  } else {
-    executionStatusField.textContent = 'The program is paused.';
-  }
+    if (lastKnownSourcePosition !== undefined && nextKnownSourcePosition !== undefined) {
+      // See if we can remove whitespace or comments on the left side.
+      let tmp = source.substring(lastKnownSourcePosition, nextKnownSourcePosition)
+                      .replace(/^(\/\/[^\n]+\n|\s+)+/g, '');
+      lastKnownSourcePosition = nextKnownSourcePosition - tmp.length;
 
-  const varNames = Object.keys(vars);
-  if (varsDisplay.children.length !== varNames.length) {
-    varsDisplay.innerHTML = '';
+      // See if we can remove whitespace or comments on the right side.
+      tmp = source.substring(lastKnownSourcePosition, nextKnownSourcePosition)
+                  .replace(/(\/\/[^\n]+\n|\s+)+$/g, '');
+      nextKnownSourcePosition = lastKnownSourcePosition + tmp.length;
 
-    for (let i = 0; i < varNames.length; i++) {
-      const row = document.createElement('tr');
-      const nameCell = document.createElement('td');
-      nameCell.classList.add('text-right', 'border-r-2', 'pr-4', 'var-name');
-      row.appendChild(nameCell);
-      const valueCell = document.createElement('td');
-      valueCell.classList.add('text-left', 'pl-4', 'var-value');
-      row.appendChild(valueCell);
-      varsDisplay.appendChild(row);
+      const codeSpan = createSpan(source, {
+        start: 0,
+        end: source.length,
+        children: [
+          {
+            start: lastKnownSourcePosition,
+            end: nextKnownSourcePosition,
+            call: (e) => e.classList.add('bg-green-600')
+          }
+        ]
+      });
+      sourceDisplay.appendChild(codeSpan);
+      return;
     }
   }
+  sourceDisplay.textContent = source;
+}
 
-  for (let i = 0; i < varNames.length; i++) {
-    const row = varsDisplay.children[i];
-    row.querySelector('.var-name').textContent = varNames[i];
-    row.querySelector('.var-value').textContent = vars[varNames[i]];
-  }
+function prepareStateDisplay({ source, sourcePositions }) {
+  return function({ pc, vars, reachedEndOfCode, isRunning, totalSteps }) {
+    setButtonEnabled(stepButton, !isRunning && !reachedEndOfCode);
+    setButtonEnabled(resumeButton, !isRunning && !reachedEndOfCode);
+    setButtonEnabled(pauseButton, isRunning);
+    setButtonEnabled(resetButton, true);
+
+    if (isRunning) {
+      executionStatusField.textContent = 'The program is still running.';
+    } else if (reachedEndOfCode) {
+      executionStatusField.textContent = `The program reached its end after ${totalSteps} steps.`;
+    } else {
+      executionStatusField.textContent = `The program was paused after ${totalSteps} steps.`;
+    }
+
+    const varNames = Object.keys(vars);
+    if (varsDisplay.children.length !== varNames.length) {
+      varsDisplay.innerHTML = '';
+
+      for (let i = 0; i < varNames.length; i++) {
+        const row = document.createElement('tr');
+        const nameCell = document.createElement('td');
+        nameCell.classList.add('text-right', 'border-r-2', 'pr-4', 'var-name');
+        row.appendChild(nameCell);
+        const valueCell = document.createElement('td');
+        valueCell.classList.add('text-left', 'pl-4', 'var-value');
+        row.appendChild(valueCell);
+        varsDisplay.appendChild(row);
+      }
+    }
+
+    for (let i = 0; i < varNames.length; i++) {
+      const row = varsDisplay.children[i];
+      row.querySelector('.var-name').textContent = varNames[i];
+      row.querySelector('.var-value').textContent = vars[varNames[i]];
+    }
+
+    displaySourceCode({ pc, sourcePositions, source, isRunning });
+  };
 }
 
 function createExecutionContext({ source, code, sourcePositions }) {
   const worker = new Worker(`worker.js?t=${Date.now()}`);
+
+  const displayState = prepareStateDisplay({ source, sourcePositions });
 
   worker.addEventListener('message', (event) => {
     displayState(event.data);
@@ -294,6 +350,9 @@ function createExecutionContext({ source, code, sourcePositions }) {
     },
     pause() {
       worker.postMessage({ type: 'pause' });
+    },
+    step() {
+      worker.postMessage({ type: 'step' })
     },
     destroy() {
       worker.terminate();

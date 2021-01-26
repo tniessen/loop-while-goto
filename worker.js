@@ -115,6 +115,17 @@ function postState() {
   postMessage({ pc, vars, reachedEndOfCode, isRunning, totalSteps });
 }
 
+function doSingleStep() {
+  stopCodeExecution();
+
+  const { cpu } = currentVm;
+  if (!cpu.reachedEndOfCode) {
+    cpu.step();
+  }
+
+  postState();
+}
+
 function resumeCodeExecution() {
   isRunning = true;
 
@@ -168,5 +179,7 @@ onmessage = function(event) {
   } else if (data.type === 'pause') {
     stopCodeExecution();
     postState();
+  } else if (data.type === 'step') {
+    doSingleStep();
   }
 };
