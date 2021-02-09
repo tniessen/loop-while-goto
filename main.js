@@ -404,7 +404,7 @@ function prepareStateDisplay({ source, code, sourcePositions }) {
     for (const element of instructionElements) {
       element.classList.remove('bg-green-600');
     }
-    if (pc < code.length) {
+    if (!isRunning && pc < code.length) {
       instructionElements[pc].classList.add('bg-green-600');
     }
   };
