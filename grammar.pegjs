@@ -1,3 +1,15 @@
+{
+  const { parserOptions } = options;
+  const {
+    allowGoto,
+    allowIf,
+    allowLoop,
+    allowStop,
+    allowWhile,
+    ifStyle
+  } = parserOptions;
+}
+
 Start
   = _ program:Program _ { return { program }; }
 
@@ -10,7 +22,7 @@ Statement
   / label:Label _ stmt:StatementWithoutLabel  { return { label, ...stmt }; }
 
 Label
-  = id:Identifier _ ':' { return id; }
+  = &{return allowGoto;} id:Identifier _ ':' { return id; }
 
 StatementWithoutLabel
   = stmt:StatementInner
@@ -18,11 +30,11 @@ StatementWithoutLabel
 
 StatementInner
   = assignment:Assignment { return assignment; }
-  / loop:Loop { return loop; }
-  / whileStmt:While { return whileStmt; }
-  / ifStmt:IfStatement { return ifStmt; }
-  / gotoStmt:GotoStatement { return gotoStmt; }
-  / stopStmt:StopStatement { return stopStmt; }
+  / &{return allowLoop;} loop:Loop { return loop; }
+  / &{return allowWhile;} whileStmt:While { return whileStmt; }
+  / &{return allowIf;} ifStmt:IfStatement { return ifStmt; }
+  / &{return allowGoto;} gotoStmt:GotoStatement { return gotoStmt; }
+  / &{return allowStop;} stopStmt:StopStatement { return stopStmt; }
 
 Assignment
   = id:Identifier _ ':=' _ value:IntExpression
@@ -48,8 +60,18 @@ While
     { return { type: 'while', condition, body }; }
 
 IfStatement
+  = &{return ifStyle !== 'goto'} stmt:RegularIfThenStatement
+    { return stmt; }
+  / &{return ifStyle === 'goto'} stmt:IfThenGotoStatement
+    { return stmt; }
+
+RegularIfThenStatement
   = 'IF' __ condition:BoolExpr __ 'THEN' __ thenPart:Program __ elsePart:('ELSE' __ p:Program __ { return p; })? 'END'
     { return { type: 'if', condition, thenPart, elsePart }; }
+
+IfThenGotoStatement
+  = 'IF' __ condition:BoolExpr __ 'THEN' __ &GotoStatement stmt:Statement
+    { return { type: 'if', condition, thenPart: [stmt] }}
 
 GotoStatement
   = 'GOTO' __ id:Identifier { return { type: 'goto', targetLabel: id }; }

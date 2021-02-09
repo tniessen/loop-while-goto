@@ -14,8 +14,46 @@
           <div class="font-mono col-span-2 border-2 bg-gray-900">
             <textarea id="source-input" class="w-full bg-gray-900 p-2" rows="15" placeholder="Enter code here"></textarea>
           </div>
-          <div class="font-mono border-2 bg-gray-900">
-            <textarea id="variable-input" class="w-full bg-gray-900 hidden" rows="15" placeholder="Input variables"></textarea>
+          <div class="border-2 bg-gray-900">
+            <div id="parser-options" class="w-full p-2">
+              <div>
+                <input type="checkbox" id="parser-option-allowloop" data-parser-option="allowLoop" checked>
+                <label for="parser-option-allowloop">
+                  Allow <code>LOOP</code> statements
+                </label>
+              </div>
+              <div>
+                <input type="checkbox" id="parser-option-allowwhile" data-parser-option="allowWhile" checked>
+                <label for="parser-option-allowwhile">
+                  Allow <code>WHILE</code> statements
+                </label>
+              </div>
+              <div>
+                <input type="checkbox" id="parser-option-allowgoto" data-parser-option="allowGoto" checked>
+                <label for="parser-option-allowgoto">
+                  Allow <code>GOTO</code> statements
+                </label>
+              </div>
+              <div>
+                <input type="checkbox" id="parser-option-allowif" data-parser-option="allowIf" checked>
+                <label for="parser-option-allowif">
+                  Allow <code>IF</code> statements
+                </label>
+              </div>
+              <div>
+                <input type="checkbox" id="parser-option-allowstop" data-parser-option="allowStop" checked>
+                <label for="parser-option-allowstop">
+                  Allow <code>STOP</code>/<code>HALT</code> statements
+                </label>
+              </div>
+              <div class="mt-4">
+                <label for="parser-option-ifstyle" class="block mb-1">Style of "IF" statements</label>
+                <select id="parser-option-ifstyle" data-parser-option="ifStyle" class="bg-gray-800 p-1 w-full">
+                  <option value="regular" selected>IF ... THEN ... (ELSE ...) END</option>
+                  <option value="goto">IF ... THEN GOTO ...</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
         <button type="button" class="border-2 p-2" id="switch-to-execution-button">Start</button>

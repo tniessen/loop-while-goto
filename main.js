@@ -16,6 +16,53 @@ const resumeButton = document.getElementById('resume-button');
 const pauseButton = document.getElementById('pause-button');
 const resetButton = document.getElementById('reset-button');
 
+function inputElement(element) {
+  const listeners = new Set();
+
+  function isCheckbox() {
+    return element.tagName.toLowerCase() === 'input' &&
+           element.getAttribute('type').toLowerCase() === 'checkbox';
+  }
+
+  function get() {
+    if (isCheckbox()) {
+      return element.checked;
+    } else {
+      return element.value;
+    }
+  }
+
+  function triggerChange() {
+    for (const listener of listeners) {
+      listener();
+    }
+  }
+
+  function onChange(fn) {
+    listeners.add(fn);
+  }
+
+  element.addEventListener('change', () => triggerChange);
+  element.addEventListener('input', () => triggerChange);
+
+  return { get, onChange };
+}
+
+const parserOptionsContainer = document.getElementById('parser-options');
+const parserOptionInputs = {};
+for (const element of parserOptionsContainer.querySelectorAll('[data-parser-option]')) {
+  const input = inputElement(element);
+  parserOptionInputs[element.getAttribute('data-parser-option')] = input;
+}
+
+function getParserOptions() {
+  const values = {};
+  for (const key in parserOptionInputs) {
+    values[key] = parserOptionInputs[key].get();
+  }
+  return values;
+}
+
 document.getElementById('switch-to-execution-button').addEventListener('click', () => {
   switchToExecutionView();
 });
@@ -282,7 +329,8 @@ function loadAndCompileGrammar() {
 function parseProgram(source) {
   return loadAndCompileGrammar().then((parser) => {
     displayLog('Parsing program...');
-    const { program } = parser.parse(source);
+    const parserOptions = getParserOptions();
+    const { program } = parser.parse(source, { parserOptions });
     return program;
   });
 }
