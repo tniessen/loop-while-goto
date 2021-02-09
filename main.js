@@ -411,7 +411,7 @@ function prepareStateDisplay({ source, code, sourcePositions }) {
     return instructionElement;
   });
 
-  return function({ pc, vars, reachedEndOfCode, isRunning, totalSteps }) {
+  return Object.assign(function({ pc, vars, reachedEndOfCode, isRunning, totalSteps }) {
     setButtonEnabled(stepButton, !isRunning && !reachedEndOfCode);
     setButtonEnabled(resumeButton, !isRunning && !reachedEndOfCode);
     setButtonEnabled(pauseButton, isRunning);
@@ -455,7 +455,12 @@ function prepareStateDisplay({ source, code, sourcePositions }) {
     if (!isRunning && pc < code.length) {
       instructionElements[pc].classList.add('bg-green-600');
     }
-  };
+  }, {
+    destroy: () => {
+      instructionsDisplay.innerHTML = '';
+      executionStatusField.textContent = '';
+    }
+  });
 }
 
 function createExecutionContext({ source, code, sourcePositions }) {
@@ -488,6 +493,7 @@ function createExecutionContext({ source, code, sourcePositions }) {
     },
     destroy() {
       worker.terminate();
+      displayState.destroy();
     }
   };
 }
