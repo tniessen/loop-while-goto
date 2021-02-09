@@ -5,6 +5,7 @@ const executionView = document.getElementById('execution-view');
 
 const sourceInput = document.querySelector('#source-input');
 const sourceDisplay = document.querySelector('#source-display');
+const instructionsDisplay = document.querySelector('#instructions-display');
 const varsInput = document.querySelector('#variable-input');
 const varsDisplay = document.querySelector('#variable-display');
 
@@ -344,7 +345,24 @@ function displaySourceCode({ pc, source, sourcePositions, isRunning }) {
   sourceDisplay.textContent = source;
 }
 
-function prepareStateDisplay({ source, sourcePositions }) {
+function prepareStateDisplay({ source, code, sourcePositions }) {
+  instructionsDisplay.innerHTML = '';
+  const instructionElements = code.map((instruction, offset) => {
+    const instructionElement = document.createElement('div');
+    let instructionText = instruction[0];
+    for (const operand of instruction.slice(1)) {
+      if (typeof operand === 'string') {
+        instructionText += ` $${operand}`;
+      } else {
+        instructionText += ` ${operand}`;
+      }
+    }
+    const offsetText = offset.toString(10).padStart(4, '0');
+    instructionElement.textContent = `${offsetText}: ${instructionText}`;
+    instructionsDisplay.appendChild(instructionElement);
+    return instructionElement;
+  });
+
   return function({ pc, vars, reachedEndOfCode, isRunning, totalSteps }) {
     setButtonEnabled(stepButton, !isRunning && !reachedEndOfCode);
     setButtonEnabled(resumeButton, !isRunning && !reachedEndOfCode);
@@ -382,13 +400,20 @@ function prepareStateDisplay({ source, sourcePositions }) {
     }
 
     displaySourceCode({ pc, sourcePositions, source, isRunning });
+
+    for (const element of instructionElements) {
+      element.classList.remove('bg-green-600');
+    }
+    if (pc < code.length) {
+      instructionElements[pc].classList.add('bg-green-600');
+    }
   };
 }
 
 function createExecutionContext({ source, code, sourcePositions }) {
   const worker = new Worker(`worker.js?t=${Date.now()}`);
 
-  const displayState = prepareStateDisplay({ source, sourcePositions });
+  const displayState = prepareStateDisplay({ source, code, sourcePositions });
 
   worker.addEventListener('message', (event) => {
     displayState(event.data);
