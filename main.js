@@ -387,10 +387,28 @@ function displaySourceCode({ pc, source, sourcePositions, isRunning }) {
         ]
       });
       sourceDisplay.appendChild(codeSpan);
+      scrollParentToShowElement(codeSpan.querySelector('.bg-green-600'), sourceDisplay);
       return;
     }
   }
   sourceDisplay.textContent = source;
+}
+
+function scrollParentToShowElement(element, parentElement) {
+  try {
+    if (parentElement === undefined)
+      parentElement = element.parentElement;
+
+    const elementOffsetInParent = element.offsetTop - parentElement.offsetTop;
+    const firstVisibleOffset = parentElement.scrollTop;
+    const lastVisibleOffset = parentElement.scrollTop + parentElement.clientHeight;
+    if (firstVisibleOffset > elementOffsetInParent || elementOffsetInParent > lastVisibleOffset) {
+      parentElement.scrollTo(0, elementOffsetInParent - 40);
+    }
+  } catch (err) {
+    // If the browser does not support this and throws, we don't really care much.
+    console.error(err);
+  }
 }
 
 function prepareStateDisplay({ source, code, sourcePositions }) {
@@ -454,6 +472,7 @@ function prepareStateDisplay({ source, code, sourcePositions }) {
     }
     if (!isRunning && pc < code.length) {
       instructionElements[pc].classList.add('bg-green-600');
+      scrollParentToShowElement(instructionElements[pc]);
     }
   }, {
     destroy: () => {
