@@ -78,6 +78,45 @@ function compile(program) {
   const code = [];
   const sourcePositions = new Map();
 
+  function createLabelScope(parentScope, scopeAffectsStackHeight) {
+    const labelPositions = new Map();
+    const instructionsWithTargetLabel = [];
+
+    function patch() {
+      for (const [instruction, label] of instructionsWithTargetLabel) {
+        if (labelPositions.has(label)) {
+          instruction.push(labelPositions.get(label));
+        } else if (scopeAffectsStackHeight) {
+          throw new Error(`Cannot jump to '${label}' from the current scope. ` +
+                          'The label is either not visible within the ' +
+                          'current scope, or jumping to the label would ' +
+                          'corrupt the stack memory of the virtual machine.');
+        } else if (parentScope !== undefined) {
+          parentScope.patchLater(instruction, label);
+        } else {
+          throw new Error(`Label does not exist in the current scope: '${label}'`);
+        }
+      }
+    }
+
+    function defineLabelHere(label) {
+      if (labelPositions.has(label)) {
+        throw new Error(`Duplicate label within the same scope: '${label}'`);
+      }
+      labelPositions.set(label, code.length);
+    }
+
+    function patchLater(instruction, label) {
+      instructionsWithTargetLabel.push([instruction, label]);
+    }
+
+    return {
+      patch,
+      defineLabelHere,
+      patchLater
+    };
+  }
+
   function compileExpression(expr) {
     if (expr.type === 'constant') {
       code.push(['ldc', expr.value]);
@@ -118,8 +157,13 @@ function compile(program) {
     code.push([opcode]);
   }
 
-  function compileStatement(statement) {
+  function compileStatement(statement, labelScope) {
     sourcePositions.set(statement.location.start.offset, code.length);
+
+    if (statement.label !== undefined) {
+      labelScope.defineLabelHere(statement.label);
+    }
+
     if (statement.type === 'assignment') {
       compileExpression(statement.value);
       code.push(['pop', statement.id]);
@@ -129,7 +173,7 @@ function compile(program) {
       code.push(['dup']);
       const skipLoopBody = ['jz'];
       code.push(skipLoopBody);
-      compileStatements(statement.body);
+      compileStatements(statement.body, labelScope, true);
       code.push(['ldc', 1]);
       code.push(['sub']);
       code.push(['jmp', loopEntryIndex]);
@@ -140,7 +184,7 @@ function compile(program) {
       compileBoolExpr(statement.condition);
       const skipLoopBody = ['jz'];
       code.push(skipLoopBody);
-      compileStatements(statement.body);
+      compileStatements(statement.body, labelScope);
       code.push(['jmp', loopEntryIndex]);
       skipLoopBody.push(code.length);
     } else if (statement.type === 'if') {
@@ -148,13 +192,13 @@ function compile(program) {
       compileBoolExpr(condition);
       const skipThenPart = ['jz'];
       code.push(skipThenPart);
-      compileStatements(thenPart);
+      compileStatements(thenPart, labelScope);
       if (elsePart) {
         const skipElsePart = ['jmp'];
         code.push(skipElsePart);
         // If the condition was not true, jump here.
         skipThenPart.push(code.length);
-        compileStatements(elsePart);
+        compileStatements(elsePart, labelScope);
         // Patch the "then" branch to jump to the next instruction after "else".
         skipElsePart.push(code.length);
       } else {
@@ -162,19 +206,34 @@ function compile(program) {
         // branch if false.
         skipThenPart.push(code.length);
       }
+    } else if (statement.type === 'goto') {
+      const jmp = ['jmp'];
+      code.push(jmp);
+      labelScope.patchLater(jmp, statement.targetLabel);
+    } else if (statement.type === 'stop') {
+      const jmp = ['jmp'];
+      code.push(jmp);
+      labelScope.patchLater(jmp, null);
     } else {
       throw new Error(`Invalid statement type: '${statement.type}'`);
     }
     sourcePositions.set(statement.location.end.offset, code.length);
   }
 
-  function compileStatements(statements) {
+  function compileStatements(statements, parentLabelScope, scopeAffectsStackHeight) {
+    const labelScope = createLabelScope(parentLabelScope, scopeAffectsStackHeight);
     for (const statement of statements) {
-      compileStatement(statement);
+      compileStatement(statement, labelScope);
     }
+    labelScope.patch();
   }
 
-  compileStatements(program);
+  // This is the main compilation step.
+  const rootLabelScope = createLabelScope();
+  compileStatements(program, rootLabelScope);
+  rootLabelScope.defineLabelHere(null);
+  rootLabelScope.patch();
+
   console.log(code.map((insn, i) => `${i.toString().padStart(4, '0')} ${insn.join(' ')}`).join('\n'));
   return { code, sourcePositions };
 }

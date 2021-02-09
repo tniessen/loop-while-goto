@@ -6,6 +6,13 @@ Program
     { return [stmt, ...stmts]; }
 
 Statement
+  = stmt:StatementWithoutLabel { return stmt; }
+  / label:Label _ stmt:StatementWithoutLabel  { return { label, ...stmt }; }
+
+Label
+  = id:Identifier _ ':' { return id; }
+
+StatementWithoutLabel
   = stmt:StatementInner
     { return { location: location(), ...stmt }; }
 
@@ -14,6 +21,8 @@ StatementInner
   / loop:Loop { return loop; }
   / whileStmt:While { return whileStmt; }
   / ifStmt:IfStatement { return ifStmt; }
+  / gotoStmt:GotoStatement { return gotoStmt; }
+  / stopStmt:StopStatement { return stopStmt; }
 
 Assignment
   = id:Identifier _ ':=' _ value:IntExpression
@@ -42,6 +51,12 @@ IfStatement
   = 'IF' __ condition:BoolExpr __ 'THEN' __ thenPart:Program __ elsePart:('ELSE' __ p:Program __ { return p; })? 'END'
     { return { type: 'if', condition, thenPart, elsePart }; }
 
+GotoStatement
+  = 'GOTO' __ id:Identifier { return { type: 'goto', targetLabel: id }; }
+
+StopStatement
+  = ('STOP' / 'HALT') { return { type: 'stop' }; }
+
 BoolExpr
   = left:Atomic _ op:BoolOp _ right:Atomic { return { left, op, right }; }
 
@@ -60,7 +75,7 @@ Integer "integer"
 
 _ "whitespace"
   = ([ \t\n\r] / Comment)*
-  
+
 __
   = ([ \t\n\r] / Comment)+
 
