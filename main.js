@@ -314,7 +314,7 @@ function createSpan(text, config) {
 }
 
 function downloadGrammar() {
-  return fetch(`/grammar.pegjs?t=${Date.now()}`)
+  return fetch(`grammar.pegjs?t=${Date.now()}`)
          .then((response) => response.text());
 }
 
